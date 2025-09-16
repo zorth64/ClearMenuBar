@@ -13,6 +13,7 @@
 
 ## Requirements
 
+- Requires macOS 13 Ventura or later.
 - The Reduce Transparency option must be enabled in the Accessibility options in the System Settings for this app to work as expected.
 - The wallpaper needs to be set with the "Fill Screen" option.
 - The wallpaper needs to be a static image. This app will not work with dynamic or aerial wallpapers.

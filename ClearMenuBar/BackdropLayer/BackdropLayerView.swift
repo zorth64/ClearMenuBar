@@ -264,7 +264,7 @@ public class BackdropLayerView: NSVisualEffectView {
         } else {
             self.backdrop!.setValue(true, forKeyPath: "filters.invert.enabled")
             self.backdrop!.setValue(true, forKeyPath: "filters.hueRotate.enabled")
-            self.backdrop!.setValue(0.0725, forKeyPath: "filters.brightness.inputAmount")
+            self.backdrop!.setValue(0.0919, forKeyPath: "filters.brightness.inputAmount")
             self.backdrop!.setValue(1.166, forKeyPath: "filters.contrast.inputAmount")
         }
     }
