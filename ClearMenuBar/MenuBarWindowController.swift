@@ -12,7 +12,10 @@ class MenuBarWindowController: NSWindowController {
     
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: NSScreen.main!.frame.height - 24, width: NSScreen.main!.frame.width, height: 24),
+            contentRect: NSRect(x: 0,
+                                y: NSScreen.main!.frame.height - (NSScreen.main!.hasNotch ? 37 : 24),
+                                width: NSScreen.main!.frame.width,
+                                height: (NSScreen.main!.hasNotch ? 37 : 24)),
             styleMask: [
             ],
             backing: .buffered, defer: false)
