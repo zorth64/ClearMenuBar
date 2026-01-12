@@ -16,4 +16,18 @@ extension NSScreen {
         
         return NSScreen.main?.safeAreaInsets.top != 0
     }
+	
+	var menuBarHeight: CGFloat {
+        let macOSVersion = ProcessInfo.processInfo.operatingSystemVersion
+        
+        if (macOSVersion.majorVersion == 26) {
+            return 31
+        } else {
+            if (self.hasNotch) {
+                return 37
+            } else {
+                return 24
+            }
+        }
+    }
 }

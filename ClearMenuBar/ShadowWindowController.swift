@@ -12,7 +12,10 @@ class ShadowWindowController: NSWindowController {
     
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: NSScreen.main!.frame.height - 80, width: NSScreen.main!.frame.width, height: 80),
+            contentRect: NSRect(x: 0,
+                                y: NSScreen.main!.frame.height - 56 - NSScreen.main!.menuBarHeight,
+                                width: NSScreen.main!.frame.width,
+                                height: 56 + NSScreen.main!.menuBarHeight),
             styleMask: [
             ],
             backing: .buffered, defer: false)

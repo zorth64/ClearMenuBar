@@ -325,13 +325,13 @@ public class BackdropLayerView: NSVisualEffectView {
                 resizedCGImage = wallpaperCGImage.resize(width: newWidth, height: newHeight)
                 
                 let xOffset = (CGFloat(newWidth) - screenWidth) / 2
-                cropRect = CGRect(x: Int(xOffset), y: 0, width: Int(screenWidth), height: (NSScreen.main!.hasNotch ? 37 : 24))
+                cropRect = CGRect(x: Int(xOffset), y: 0, width: Int(screenWidth), height: Int(NSScreen.main!.menuBarHeight))
             } else {
                 newHeight = Int(screenWidth / CGFloat(wallpaperCGImage.width) * CGFloat(wallpaperCGImage.height))
                 resizedCGImage = wallpaperCGImage.resize(width: newWidth, height: newHeight)
                 
                 let yOffset = (CGFloat(newHeight) - screenHeight) / 2
-                cropRect = CGRect(x: 0, y: Int(yOffset), width: Int(screenWidth), height: (NSScreen.main!.hasNotch ? 37 : 24))
+                cropRect = CGRect(x: 0, y: Int(yOffset), width: Int(screenWidth), height: Int(NSScreen.main!.menuBarHeight))
             }
             
             if let croppedCGImage = resizedCGImage?.cropping(to: cropRect!) {
