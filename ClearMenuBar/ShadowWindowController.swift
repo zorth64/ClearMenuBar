@@ -15,7 +15,7 @@ class ShadowWindowController: NSWindowController {
             contentRect: NSRect(x: 0,
                                 y: NSScreen.main!.frame.height - 56 - NSScreen.main!.menuBarHeight,
                                 width: NSScreen.main!.frame.width,
-                                height: 56 + NSScreen.main!.menuBarHeight),
+                                height: 80),
             styleMask: [
             ],
             backing: .buffered, defer: false)
