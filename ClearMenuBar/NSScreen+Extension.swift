@@ -24,7 +24,7 @@ extension NSScreen {
             return 33
         } else {
             if (self.hasNotch) {
-                return 38
+                return 43
             } else {
                 return 24
             }
