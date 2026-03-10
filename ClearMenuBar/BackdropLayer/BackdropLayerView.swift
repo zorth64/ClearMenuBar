@@ -301,9 +301,10 @@ public class BackdropLayerView: NSVisualEffectView {
     func updateWallaper(path: URL) {
         if self.currentWallpaperPath != path {
             self.currentWallpaperPath = path
-            if let croppedImage = self.cropWallpaperBelowMenuBarArea(imagePath: path) {
+            if let croppedImage = self.cropWallpaperBelowMenuBarArea(imagePath: path),
+               let isDirectory = Wallpaper.isWallpaperFromADirectory(screen: .main).first! {
                 CATransaction.begin()
-                CATransaction.setAnimationDuration(path.isDirectory ? self.transitionDuration : 0.0)
+                CATransaction.setAnimationDuration(isDirectory ? self.transitionDuration : 0.0)
                 
                 self.wallpaper?.contents = croppedImage
                 

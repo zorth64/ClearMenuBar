@@ -30,7 +30,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         let shadowWindow = ShadowWindow(
             contentRect: NSRect(x: 0,
-                                y: NSScreen.main!.frame.height - 56 - NSScreen.main!.menuBarHeight,
+                                y: NSScreen.main!.frame.height - (NSScreen.main!.menuBarHeight + 80),
                                 width: NSScreen.main!.frame.width,
                                 height: 80),
             styleMask: [

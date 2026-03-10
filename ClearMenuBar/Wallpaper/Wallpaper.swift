@@ -179,4 +179,10 @@ public enum Wallpaper {
         let wallpaperURLs = screen.nsScreens.compactMap { NSWorkspace.shared.desktopImageURL(for: $0) }
         return wallpaperURLs.map { $0.isDirectory ? getCurrentWallpaperURL() : $0 }
     }
+    
+    public static func isWallpaperFromADirectory(screen: Screen = .all) -> [Bool?] {
+        let wallpaperURLs = screen.nsScreens.compactMap{ NSWorkspace.shared.desktopImageURL(for: $0) }
+        
+        return wallpaperURLs.map { $0.isDirectory }
+    }
 }
