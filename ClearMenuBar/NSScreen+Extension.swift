@@ -21,7 +21,7 @@ extension NSScreen {
         let macOSVersion = ProcessInfo.processInfo.operatingSystemVersion
         
         if (macOSVersion.majorVersion == 26) {
-            return 32
+            return 34
         } else {
             if (self.hasNotch) {
                 return 38

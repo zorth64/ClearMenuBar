@@ -8,39 +8,45 @@
 import Cocoa
 import SwiftUI
 
-class MenuBarWindowController: NSWindowController {
+class MenuBarWindow: NSWindow {
     
-    convenience init() {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0,
-                                y: NSScreen.main!.frame.height - NSScreen.main!.menuBarHeight,
-                                width: NSScreen.main!.frame.width,
-                                height: NSScreen.main!.menuBarHeight),
-            styleMask: [
-            ],
-            backing: .buffered, defer: false)
+    override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask, backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
+        super.init(contentRect: contentRect, styleMask: style, backing: backingStoreType, defer: flag)
+    }
+    
+    func setup() {
+        titleVisibility = .hidden
+        titlebarAppearsTransparent = true
+        isOpaque = false
+        hasShadow = false
         
-        window.titleVisibility = .hidden
-        window.titlebarAppearsTransparent = true
-        window.isOpaque = false
-        window.hasShadow = false
+        level = NSWindow.Level.statusBar
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenNone]
+        backgroundColor = NSColor.clear
+        alphaValue = 0.0
+        ignoresMouseEvents = true
         
-        window.level = NSWindow.Level.statusBar
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenNone]
-        window.backgroundColor = NSColor.clear
-        window.alphaValue = 1.0
-        window.ignoresMouseEvents = true
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 2.0
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            
+            self.animator().alphaValue = 1.0
+        })
+    }
+}
 
+class MenuBarWindowController: NSWindowController {
+    init(window: MenuBarWindow) {
+        super.init(window: window)
         let contentView = ContentView()
             .edgesIgnoringSafeArea(.all)
             .allowsHitTesting(false)
 
         window.contentView = NSHostingView(rootView: contentView)
-
-        self.init(window: window)
+        window.setup()
     }
     
-    override func windowDidLoad() {
-        super.windowDidLoad()
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 }

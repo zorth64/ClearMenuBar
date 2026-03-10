@@ -16,10 +16,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @IBOutlet weak var menu: NSMenu?
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
-        let menuBarWindowController = MenuBarWindowController()
+        let menuBarWindow = MenuBarWindow(
+            contentRect: NSRect(x: 0,
+                                y: NSScreen.main!.frame.height - NSScreen.main!.menuBarHeight,
+                                width: NSScreen.main!.frame.width,
+                                height: NSScreen.main!.menuBarHeight),
+            styleMask: [
+            ],
+            backing: .buffered, defer: false)
+        
+        let menuBarWindowController = MenuBarWindowController(window: menuBarWindow)
         menuBarWindowController.showWindow(self)
         
-        let shadowWindowController = ShadowWindowController()
+        let shadowWindow = ShadowWindow(
+            contentRect: NSRect(x: 0,
+                                y: NSScreen.main!.frame.height - 56 - NSScreen.main!.menuBarHeight,
+                                width: NSScreen.main!.frame.width,
+                                height: 80),
+            styleMask: [
+           ],
+            backing: .buffered, defer: false
+        )
+        
+        let shadowWindowController = ShadowWindowController(window: shadowWindow)
         shadowWindowController.showWindow(self)
     }
     
@@ -49,4 +68,3 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
 }
-

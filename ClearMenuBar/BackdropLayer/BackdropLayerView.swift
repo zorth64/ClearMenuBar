@@ -22,6 +22,12 @@ public class BackdropLayerView: NSVisualEffectView {
     
     private var transitionDuration: CFTimeInterval = 2.0
     
+    private var screenDidWakeObserver: NSObjectProtocol?
+    private var screenUnlockedObserver: NSObjectProtocol?
+    private var spaceChangeObserver: NSObjectProtocol?
+    
+    private var logStreamObserver: LogStream?
+    
     public struct Effect {
             
         /// The `backgroundColor` is and autoclosure used to dynamically blend with
@@ -131,6 +137,7 @@ public class BackdropLayerView: NSVisualEffectView {
         super.init(frame: frameRect)
         self.commonInit()
     }
+    
     public required init?(coder decoder: NSCoder) {
         super.init(coder: decoder)
         self.commonInit()
@@ -145,27 +152,24 @@ public class BackdropLayerView: NSVisualEffectView {
         self.wallpaper = CALayer()
         self.wallpaper!.name = "wallpaper"
         
-        if let wallpaperPath = getLastWallpaperImagePath() {
-            self.currentWallpaperPath = wallpaperPath
-            let croppedImage = cropWallpaperBelowMenuBarArea(imagePath: wallpaperPath)
-            
-            self.wallpaper?.contents = croppedImage
-            
-            if let vibranceFilter = CIFilter(name: "CIVibrance") {
-                vibranceFilter.name = "vibrance"
-                self.wallpaper?.filters = [vibranceFilter]
-            }
-            if let colorControlsFilter = CIFilter(name: "CIColorControls") {
-                colorControlsFilter.name = "colorControls"
-                self.wallpaper!.filters?.append(colorControlsFilter)
-            }
-            if let exposureFilter = CIFilter(name: "CIExposureAdjust") {
-                exposureFilter.name = "exposureAdjust"
-                self.wallpaper!.filters?.append(exposureFilter)
-            }
-            
-            self.wallpaper!.compositingFilter = CAFilter.init(type: kCAFilterScreenBlendMode)
+        if let windowID = getCurrentWallpaperWindowID() {
+            self.wallpaper?.contents = getWallpaperScreenshot(cgWindowID: windowID)
         }
+        
+        if let vibranceFilter = CIFilter(name: "CIVibrance") {
+            vibranceFilter.name = "vibrance"
+            self.wallpaper?.filters = [vibranceFilter]
+        }
+        if let colorControlsFilter = CIFilter(name: "CIColorControls") {
+            colorControlsFilter.name = "colorControls"
+            self.wallpaper!.filters?.append(colorControlsFilter)
+        }
+        if let exposureFilter = CIFilter(name: "CIExposureAdjust") {
+            exposureFilter.name = "exposureAdjust"
+            self.wallpaper!.filters?.append(exposureFilter)
+        }
+        
+        self.wallpaper!.compositingFilter = CAFilter.init(type: kCAFilterScreenBlendMode)
         
         // Essentially, tell the `NSVisualEffectView` to not do its job:
         super.state = .active
@@ -213,6 +217,7 @@ public class BackdropLayerView: NSVisualEffectView {
         
         self.tint = CALayer()
         self.tint?.name = "tint"
+        
         self.container = CALayer()
         self.container?.name = "container"
         self.container?.masksToBounds = true
@@ -226,26 +231,44 @@ public class BackdropLayerView: NSVisualEffectView {
         
         self.effect = .clear
         
-        DistributedNotificationCenter.default.addObserver(forName: .init("com.apple.screenIsUnlocked"), object: nil, queue: .main) { _ in
+        screenDidWakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.screensDidWakeNotification,
+            object: nil,
+            queue: OperationQueue.main) { _ in
+                if let windowID = self.getCurrentWallpaperWindowID() {
+                    self.wallpaper?.contents = self.getWallpaperScreenshot(cgWindowID: windowID)
+                }
+            }
+        
+        screenUnlockedObserver = DistributedNotificationCenter.default.addObserver(forName: .init("com.apple.screenIsUnlocked"), object: nil, queue: .main) { _ in
             if let path = self.getLastWallpaperImagePath() {
                 if self.currentWallpaperPath != path {
                     self.currentWallpaperPath = path
-                    let croppedImage = self.cropWallpaperBelowMenuBarArea(imagePath: path)
-                    
-                    CATransaction.begin()
-                    CATransaction.setAnimationDuration(self.transitionDuration)
-                    
-                    self.wallpaper?.contents = croppedImage
-                    
-                    CATransaction.commit()
+                    if let windowID = self.getCurrentWallpaperWindowID() {
+                        self.wallpaper?.contents = self.getWallpaperScreenshot(cgWindowID: windowID)
+                    }
                 }
             }
         }
         
         let logStreamDelegate = LogStreamDelegate()
-        let logStream = LogStream.init(subsystem: "com.apple.wallpaper", delegate: logStreamDelegate)
+        logStreamObserver = LogStream.init(subsystem: "com.apple.wallpaper", delegate: logStreamDelegate)
         
         NotificationCenter.default.addObserver(self, selector: #selector(wallpaperChanged(_:)), name: .wallpaperChanged, object: nil)
+        
+        spaceChangeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil,
+            queue: OperationQueue.main) { _ in
+                if let windowID = self.getCurrentWallpaperWindowID() {
+                    CATransaction.begin()
+                    CATransaction.setAnimationDuration(0.0)
+                    
+                    self.wallpaper?.contents = self.getWallpaperScreenshot(cgWindowID: windowID)
+                    
+                    CATransaction.commit()
+                }
+            }
     }
     
     public override func viewDidChangeEffectiveAppearance() {
@@ -278,14 +301,14 @@ public class BackdropLayerView: NSVisualEffectView {
     func updateWallaper(path: URL) {
         if self.currentWallpaperPath != path {
             self.currentWallpaperPath = path
-            let croppedImage = self.cropWallpaperBelowMenuBarArea(imagePath: path)
-            
-            CATransaction.begin()
-            CATransaction.setAnimationDuration(self.transitionDuration)
-            
-            self.wallpaper?.contents = croppedImage
-            
-            CATransaction.commit()
+            if let croppedImage = self.cropWallpaperBelowMenuBarArea(imagePath: path) {
+                CATransaction.begin()
+                CATransaction.setAnimationDuration(path.isDirectory ? self.transitionDuration : 0.0)
+                
+                self.wallpaper?.contents = croppedImage
+                
+                CATransaction.commit()
+            }
         }
     }
     
@@ -314,15 +337,18 @@ public class BackdropLayerView: NSVisualEffectView {
             let screenProportion = screenWidth / screenHeight
             let wallpaperProportion = CGFloat(wallpaperCGImage.width) / CGFloat(wallpaperCGImage.height)
             
-            
             var newWidth = Int(screenWidth)
             var newHeight = Int(screenHeight)
-            let resizedCGImage: CGImage?
-            let cropRect: CGRect?
+            var resizedCGImage: CGImage?
+            let cropRect: CGRect
             
             if wallpaperProportion >= screenProportion {
                 newWidth = Int(screenHeight / CGFloat(wallpaperCGImage.height) * CGFloat(wallpaperCGImage.width))
                 resizedCGImage = wallpaperCGImage.resize(width: newWidth, height: newHeight)
+                
+                while (resizedCGImage == nil) {
+                    resizedCGImage = wallpaperCGImage.resize(width: newWidth, height: newHeight)
+                }
                 
                 let xOffset = (CGFloat(newWidth) - screenWidth) / 2
                 cropRect = CGRect(x: Int(xOffset), y: 0, width: Int(screenWidth), height: Int(NSScreen.main!.menuBarHeight))
@@ -330,17 +356,59 @@ public class BackdropLayerView: NSVisualEffectView {
                 newHeight = Int(screenWidth / CGFloat(wallpaperCGImage.width) * CGFloat(wallpaperCGImage.height))
                 resizedCGImage = wallpaperCGImage.resize(width: newWidth, height: newHeight)
                 
+                while (resizedCGImage == nil) {
+                    resizedCGImage = wallpaperCGImage.resize(width: newWidth, height: newHeight)
+                }
+                
                 let yOffset = (CGFloat(newHeight) - screenHeight) / 2
                 cropRect = CGRect(x: 0, y: Int(yOffset), width: Int(screenWidth), height: Int(NSScreen.main!.menuBarHeight))
             }
             
-            if let croppedCGImage = resizedCGImage?.cropping(to: cropRect!) {
-                let croppedImage = NSImage(cgImage: croppedCGImage, size: NSSize(width: Int(screenWidth), height: Int(screenHeight)))
-                return croppedImage
+            var croppedCGImage = resizedCGImage?.cropping(to: cropRect)
+            
+            while croppedCGImage == nil {
+                croppedCGImage = resizedCGImage?.cropping(to: cropRect)
             }
+
+            let croppedImage = NSImage(cgImage: croppedCGImage!, size: NSSize(width: Int(screenWidth), height: Int(screenHeight)))
+            
+            return croppedImage
         }
         
         return nil
+    }
+    
+    private func getCurrentWallpaperWindowID() -> CGWindowID? {
+        guard let windowList = CGWindowListCopyWindowInfo(
+            [.optionOnScreenOnly],
+            kCGNullWindowID
+        ) as? [[String: Any]] else { return nil }
+        
+        for window in windowList {
+            guard
+                let cgWindowID = window[kCGWindowNumber as String] as? CGWindowID,
+                let layer = window[kCGWindowLayer as String] as? Int,
+                let ownerName = window[kCGWindowOwnerName as String] as? String,
+                ownerName == "Dock",
+                let windowName = window[kCGWindowName as String] as? String,
+                windowName.contains(/^Wallpaper/),
+                let boundsDict = window[kCGWindowBounds as String] as? [String: CGFloat],
+                boundsDict["Width"] ?? 0 == NSScreen.main!.frame.width,
+                boundsDict["Height"] ?? 0 == NSScreen.main!.frame.height
+            else {
+                continue
+            }
+            
+            return cgWindowID
+        }
+
+        return nil
+    }
+    
+    private func getWallpaperScreenshot(cgWindowID: CGWindowID) -> CGImage? {
+        let options: CGWindowListOption = [.optionAll, .optionIncludingWindow]
+        guard let image = CGWindowListCreateImage(CGRect.init(x: 0, y: 0, width: NSScreen.main!.frame.width, height: NSScreen.main!.menuBarHeight), options, cgWindowID, .nominalResolution) else { return nil }
+        return image
     }
     
     /// Update sublayer `frame`.
@@ -362,6 +430,22 @@ public class BackdropLayerView: NSVisualEffectView {
         self.tint!.contentsScale = scale
     }
     
+    deinit {
+        if let observer = screenDidWakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+            screenDidWakeObserver = nil
+        }
+        if let observer = screenUnlockedObserver {
+            DistributedNotificationCenter.default.removeObserver(observer)
+            screenUnlockedObserver = nil
+        }
+        if let observer = spaceChangeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+            spaceChangeObserver = nil
+        }
+        NotificationCenter.default.removeObserver(self, name: .wallpaperChanged, object: nil)
+        logStreamObserver = nil
+    }
 }
 
 extension CGImage {
