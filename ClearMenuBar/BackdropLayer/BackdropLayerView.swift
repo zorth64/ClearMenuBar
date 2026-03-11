@@ -342,13 +342,15 @@ public class BackdropLayerView: NSVisualEffectView {
             var newHeight = Int(screenHeight)
             var resizedCGImage: CGImage?
             let cropRect: CGRect
+            var count = 3
             
             if wallpaperProportion >= screenProportion {
                 newWidth = Int(screenHeight / CGFloat(wallpaperCGImage.height) * CGFloat(wallpaperCGImage.width))
                 resizedCGImage = wallpaperCGImage.resize(width: newWidth, height: newHeight)
                 
-                while (resizedCGImage == nil) {
+                while (count > 0 && resizedCGImage == nil) {
                     resizedCGImage = wallpaperCGImage.resize(width: newWidth, height: newHeight)
+                    count -= 1
                 }
                 
                 let xOffset = (CGFloat(newWidth) - screenWidth) / 2
@@ -357,8 +359,9 @@ public class BackdropLayerView: NSVisualEffectView {
                 newHeight = Int(screenWidth / CGFloat(wallpaperCGImage.width) * CGFloat(wallpaperCGImage.height))
                 resizedCGImage = wallpaperCGImage.resize(width: newWidth, height: newHeight)
                 
-                while (resizedCGImage == nil) {
+                while (count > 0 && resizedCGImage == nil) {
                     resizedCGImage = wallpaperCGImage.resize(width: newWidth, height: newHeight)
+                    count -= 1
                 }
                 
                 let yOffset = (CGFloat(newHeight) - screenHeight) / 2
@@ -451,9 +454,32 @@ public class BackdropLayerView: NSVisualEffectView {
 
 extension CGImage {
     func resize(width: Int, height: Int) -> CGImage? {
-        let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: bitsPerComponent, bytesPerRow: 0, space: colorSpace ?? CGColorSpaceCreateDeviceRGB(), bitmapInfo: bitmapInfo.rawValue)
-        context?.interpolationQuality = .high
-        context?.draw(self, in: CGRect(x: 0, y: 0, width: width, height: height))
-        return context?.makeImage()
+        guard width > 0, height > 0 else { return nil }
+
+        let rep = NSBitmapImageRep(cgImage: self)
+
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            print("Failed to create CGContext")
+            return nil
+        }
+
+        context.interpolationQuality = .high
+
+        context.draw(
+            rep.cgImage!,
+            in: CGRect(x: 0, y: 0, width: width, height: height)
+        )
+
+        return context.makeImage()
     }
 }
