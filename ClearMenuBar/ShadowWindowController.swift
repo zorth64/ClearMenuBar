@@ -38,11 +38,10 @@ class ShadowWindow: NSWindow {
 class ShadowWindowController: NSWindowController {
     init(window: ShadowWindow) {
         super.init(window: window)
-        let contentView = ShadowView()
-            .edgesIgnoringSafeArea(.all)
-            .allowsHitTesting(false)
+        let shadowView = ShadowView(frame: .zero)
+        shadowView.autoresizingMask = [.width]
 
-        window.contentView = NSHostingView(rootView: contentView)
+        window.contentView = shadowView
         window.setup()
     }
     
