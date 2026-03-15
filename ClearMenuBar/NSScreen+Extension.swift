@@ -21,13 +21,20 @@ extension NSScreen {
         let macOSVersion = ProcessInfo.processInfo.operatingSystemVersion
         
         if (macOSVersion.majorVersion == 26) {
-            return 33
+            return max(visibleMenuBarHeight, 31)
         } else {
             if (self.hasNotch) {
-                return 43
+                return max(visibleMenuBarHeight, 37)
             } else {
-                return 24
+                return max(visibleMenuBarHeight, 24)
             }
         }
+    }
+    
+    var visibleMenuBarHeight: CGFloat {
+        let dockHeight = NSScreen.main!.visibleFrame.origin.y - NSScreen.main!.frame.origin.y
+        let menuBarHeight = NSScreen.main!.frame.height - NSScreen.main!.visibleFrame.height - dockHeight - 1
+        
+        return menuBarHeight
     }
 }

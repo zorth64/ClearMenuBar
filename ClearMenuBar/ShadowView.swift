@@ -13,14 +13,18 @@ struct ShadowView: View {
             .fill(.clear)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background {
-                LinearGradient(stops: [
-                    Gradient.Stop(color: .black.opacity(0.295), location: 0.0),
-                    Gradient.Stop(color: .black.opacity(0.25), location: 0.11),
-                    Gradient.Stop(color: .black.opacity(0.193), location: 0.3),
-                    Gradient.Stop(color: .black.opacity(0.097), location: 0.6),
-                    Gradient.Stop(color: .black.opacity(0.048), location: 0.75),
-                    Gradient.Stop(color: .clear, location: 1.0)
-                ], startPoint: .init(x: 1, y: 0.3), endPoint: .init(x: 1, y: 1))
+                LinearGradient(
+                    stops: (0...60).map { i in
+                        let t = Double(i) / 60
+                        let eased = t * t * (3 - 2 * t)
+                        return .init(
+                            color: .black.opacity(0.295 * (1 - eased)),
+                            location: t
+                        )
+                    },
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
             }
             .edgesIgnoringSafeArea(.all)
     }
