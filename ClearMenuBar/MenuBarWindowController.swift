@@ -38,11 +38,13 @@ class MenuBarWindow: NSWindow {
 class MenuBarWindowController: NSWindowController {
     init(window: MenuBarWindow) {
         super.init(window: window)
-        let contentView = ContentView()
-            .edgesIgnoringSafeArea(.all)
-            .allowsHitTesting(false)
-
-        window.contentView = NSHostingView(rootView: contentView)
+        
+        let backdropView = BackdropLayerView()
+        backdropView.layerUsesCoreImageFilters = true
+        backdropView.autoresizingMask = [.width]
+        
+        window.contentView = backdropView
+        
         window.setup()
     }
     

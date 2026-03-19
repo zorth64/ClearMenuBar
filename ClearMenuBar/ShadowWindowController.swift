@@ -21,7 +21,7 @@ class ShadowWindow: NSWindow {
         hasShadow = false
         
         level = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenNone]
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenNone, .stationary]
         backgroundColor = NSColor.clear
         alphaValue = 0.0
         ignoresMouseEvents = true
@@ -38,7 +38,8 @@ class ShadowWindow: NSWindow {
 class ShadowWindowController: NSWindowController {
     init(window: ShadowWindow) {
         super.init(window: window)
-        let shadowView = ShadowView(frame: .zero)
+        
+        let shadowView = ShadowLayerView(frame: window.contentView!.bounds)
         shadowView.autoresizingMask = [.width]
 
         window.contentView = shadowView

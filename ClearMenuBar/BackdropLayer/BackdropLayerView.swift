@@ -16,6 +16,8 @@ public class BackdropLayerView: NSVisualEffectView {
     private var container: CALayer? = nil
     
     private var wallpaper: CALayer? = nil
+    private var wallpaperContainer: CALayer? = nil
+    
     private var currentWallpaperPath: URL?
     
     private var timer: Timer?
@@ -26,37 +28,8 @@ public class BackdropLayerView: NSVisualEffectView {
     private var screenUnlockedObserver: NSObjectProtocol?
     private var spaceChangeObserver: NSObjectProtocol?
     
+    private var logStreamDelegate: LogStreamDelegate?
     private var logStreamObserver: LogStream?
-    
-    public struct Effect {
-            
-        /// The `backgroundColor` is and autoclosure used to dynamically blend with
-        /// the layers and contents behind the `BackdropView`.
-        public let backgroundColor: () -> (NSColor)
-        
-        /// The `tintColor` is an autoclosure used to dynamically set the tint color.
-        /// This is also the color used when the `BackdropView` is visually inactive.
-        public let tintColor: () -> (NSColor)
-        
-        /// The `tintFilter` can be any object accepted by `CALayer.compositingFilter`.
-        public let tintFilter: Any?
-        
-        /// Create a new `BackdropView.Effect` with the provided parameters.
-        public init(_ backgroundColor: @autoclosure @escaping () -> (NSColor),
-                    _ tintColor: @autoclosure @escaping () -> (NSColor),
-                    _ tintFilter: Any?)
-        {
-            self.backgroundColor = backgroundColor
-            self.tintColor = tintColor
-            self.tintFilter = tintFilter
-        }
-        
-        /// A clear effect (only applies blur and saturation); when inactive,
-        /// appears transparent. Not suggested for typical use.
-        public static var clear = Effect(NSColor.clear,
-                                         NSColor.clear,
-                                         nil)
-    }
     
     public final class BlendGroup {
         
@@ -88,11 +61,9 @@ public class BackdropLayerView: NSVisualEffectView {
         }
     }
     
-    public var effect: BackdropLayerView.Effect = .clear {
+    public var effect: OverlayEffect = .clear {
         didSet {
-            self.backdrop?.backgroundColor = self.effect.backgroundColor().cgColor
             self.tint?.backgroundColor = self.effect.tintColor().cgColor
-            self.tint?.compositingFilter = self.effect.tintFilter
         }
     }
     
@@ -149,6 +120,12 @@ public class BackdropLayerView: NSVisualEffectView {
         self.layer?.masksToBounds = true
         self.layer?.name = "view"
         
+        self.tint = CALayer()
+        self.tint?.name = "tint"
+        
+        self.wallpaperContainer = CALayer()
+        self.wallpaperContainer!.name = "wallpaperContainer"
+        
         self.wallpaper = CALayer()
         self.wallpaper!.name = "wallpaper"
         
@@ -169,7 +146,8 @@ public class BackdropLayerView: NSVisualEffectView {
             self.wallpaper!.filters?.append(exposureFilter)
         }
         
-        self.wallpaper!.compositingFilter = CAFilter.init(type: kCAFilterScreenBlendMode)
+        self.wallpaperContainer?.sublayers = [self.wallpaper!, self.tint!]
+        self.wallpaperContainer!.compositingFilter = CAFilter.init(type: kCAFilterScreenBlendMode)
         
         // Essentially, tell the `NSVisualEffectView` to not do its job:
         super.state = .active
@@ -215,21 +193,16 @@ public class BackdropLayerView: NSVisualEffectView {
         self.gradient = CAGradientLayer()
         self.gradient?.name = "gradient"
         
-        self.tint = CALayer()
-        self.tint?.name = "tint"
-        
         self.container = CALayer()
         self.container?.name = "container"
         self.container?.masksToBounds = true
         self.container?.allowsEdgeAntialiasing = true
-        self.container?.sublayers = [self.backdrop!, self.tint!, self.wallpaper!]
+        self.container?.sublayers = [self.backdrop!, self.wallpaperContainer!]
         
         self.layer?.insertSublayer(self.container!, at: 0)
         
         self._state = .active
         self.blendingMode = .behindWindow
-        
-        self.effect = .clear
         
         screenDidWakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.screensDidWakeNotification,
@@ -251,8 +224,8 @@ public class BackdropLayerView: NSVisualEffectView {
             }
         }
         
-        let logStreamDelegate = LogStreamDelegate()
-        logStreamObserver = LogStream.init(subsystem: "com.apple.wallpaper", delegate: logStreamDelegate)
+        logStreamDelegate = LogStreamDelegate()
+        logStreamObserver = LogStream.init(subsystem: "com.apple.wallpaper", delegate: logStreamDelegate!)
         
         NotificationCenter.default.addObserver(self, selector: #selector(wallpaperChanged(_:)), name: .wallpaperChanged, object: nil)
         
@@ -274,19 +247,18 @@ public class BackdropLayerView: NSVisualEffectView {
     public override func viewDidChangeEffectiveAppearance() {
         let systemAppearance: NSAppearance = NSApplication.shared.effectiveAppearance
         
-        exposureFactor = -1.0
-        
-        self.wallpaper!.compositingFilter = CAFilter.init(type: kCAFilterScreenBlendMode)
-        
         if (systemAppearance.name == NSAppearance.Name.darkAqua) {
+            self.wallpaperContainer!.compositingFilter = CAFilter.init(type: kCAFilterScreenBlendMode)
+            self.effect = .darkShadow
             self.backdrop!.setValue(false, forKeyPath: "filters.invert.enabled")
             self.backdrop!.setValue(false, forKeyPath: "filters.hueRotate.enabled")
             self.backdrop!.setValue(-0.063, forKeyPath: "filters.brightness.inputAmount")
             self.backdrop!.setValue(1.14, forKeyPath: "filters.contrast.inputAmount")
-            
         } else {
-            self.backdrop!.setValue(true, forKeyPath: "filters.invert.enabled")
-            self.backdrop!.setValue(true, forKeyPath: "filters.hueRotate.enabled")
+            self.wallpaperContainer!.compositingFilter = CAFilter.init(type: kCAFilterMultiplyBlendMode)
+            self.effect = .lightShadow
+            self.backdrop!.setValue(false, forKeyPath: "filters.invert.enabled")
+            self.backdrop!.setValue(false, forKeyPath: "filters.hueRotate.enabled")
             self.backdrop!.setValue(0.0919, forKeyPath: "filters.brightness.inputAmount")
             self.backdrop!.setValue(1.166, forKeyPath: "filters.contrast.inputAmount")
         }
@@ -391,7 +363,6 @@ public class BackdropLayerView: NSVisualEffectView {
         for window in windowList {
             guard
                 let cgWindowID = window[kCGWindowNumber as String] as? CGWindowID,
-                let layer = window[kCGWindowLayer as String] as? Int,
                 let ownerName = window[kCGWindowOwnerName as String] as? String,
                 ownerName == "Dock",
                 let windowName = window[kCGWindowName as String] as? String,
@@ -422,6 +393,7 @@ public class BackdropLayerView: NSVisualEffectView {
         self.backdrop!.frame = self.layer?.bounds.offsetBy(dx: 0, dy: 0) ?? .zero
         self.tint!.frame = self.layer?.bounds ?? .zero
         self.wallpaper!.frame = self.layer?.bounds.offsetBy(dx: 0, dy: 0) ?? .zero
+        self.wallpaperContainer!.frame = self.layer?.bounds ?? .zero
         self.gradient!.frame = self.layer?.bounds ?? .zero
     }
     
@@ -432,6 +404,8 @@ public class BackdropLayerView: NSVisualEffectView {
         self.container!.contentsScale = scale
         self.backdrop!.contentsScale = scale
         self.tint!.contentsScale = scale
+        self.wallpaper!.contentsScale = scale
+        self.wallpaperContainer!.contentsScale = scale
     }
     
     deinit {
