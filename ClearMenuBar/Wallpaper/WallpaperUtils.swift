@@ -41,7 +41,7 @@ extension NSScreen {
     private func infoForCGDisplay(_ displayID: CGDirectDisplayID, options: Int) -> [AnyHashable: Any]? {
         var iterator: io_iterator_t = 0
 
-        let result = IOServiceGetMatchingServices(kIOMasterPortDefault, IOServiceMatching("IODisplayConnect"), &iterator)
+        let result = IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IODisplayConnect"), &iterator)
         guard result == kIOReturnSuccess else {
             print("Could not find services for IODisplayConnect: \(result)")
             return nil

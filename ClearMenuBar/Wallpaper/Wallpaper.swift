@@ -47,12 +47,12 @@ public enum Wallpaper {
     
     public static func getLastWallpaperURL() -> URL? {
         let task = Process()
-        task.launchPath = "/bin/sh"
+        task.executableURL = URL(fileURLWithPath: "/bin/sh")
         task.arguments = ["-c", "log show --last 2m --style syslog --predicate 'subsystem==\"com.apple.wallpaper\" and category==\"image-cache\" and composedMessage contains \"BEGIN - Image cache lookup - url\"' | tail -n 1 | grep -o 'file:///.*,' | sed -e 's/\\,.*$//'"]
 
         let pipe = Pipe()
         task.standardOutput = pipe
-        task.launch()
+        try? task.run()
 
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         if let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
@@ -98,12 +98,12 @@ public enum Wallpaper {
     
     public static func getCurrentWallpaperURL() -> URL? {
         let task = Process()
-        task.launchPath = "/bin/sh"
+        task.executableURL = URL(fileURLWithPath: "/bin/sh")
         task.arguments = ["-c", "log show --last 2s --style syslog --predicate 'subsystem==\"com.apple.wallpaper\" and category==\"image-cache\" and composedMessage contains \"BEGIN - Image cache lookup - url\"' | tail -n 1 | grep -o 'file:///.*,' | sed -e 's/\\,.*$//'"]
 
         let pipe = Pipe()
         task.standardOutput = pipe
-        task.launch()
+        try? task.run()
 
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         if let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
@@ -155,7 +155,7 @@ public enum Wallpaper {
         process.arguments = ["stream", "--predicate", "subsystem=='com.apple.wallpaper' and category=='image-cache' and composedMessage contains 'BEGIN - Image cache lookup - url'"]
         
         process.standardOutput = pipe
-        process.launch()
+        try? process.run()
         
         let fileHandle = pipe.fileHandleForReading
         fileHandle.readInBackgroundAndNotify()
