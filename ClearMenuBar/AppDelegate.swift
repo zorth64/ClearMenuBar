@@ -62,6 +62,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             statusItem?.button?.image = image.withSymbolConfiguration(config)
         }
         
+        statusItem?.behavior = .removalAllowed
+
         if let menu = menu {
             statusItem?.menu = menu
         }
@@ -88,6 +90,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         preferencesWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    // If the menu bar item was hidden, and the user reopens the app while it's running, show the menu bar item again.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if statusItem?.isVisible == false {
+            statusItem?.isVisible = true
+        }
+        return true
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {

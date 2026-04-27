@@ -11,14 +11,13 @@ class LogStreamDelegate: LogStreamDelegateProtocol {
     
     private var isLocked: Bool = false
     private let lockDuration: TimeInterval = 0.25
+    private let regex = try! NSRegularExpression(pattern: "url: (file://[^,]+)", options: [])
     
     func newLogEntry(entry: BHSwiftOSLogStream.LogEntry, history: BHSwiftOSLogStream.History<BHSwiftOSLogStream.LogEntry>) {
         
         guard (entry.description.contains("BEGIN - Image cache lookup - url: file")) else { return }
         
         guard (!isLocked) else { return }
-        
-        let regex = try! NSRegularExpression(pattern: "url: (file://[^,]+)", options: [])
         
         let matches = regex.matches(in: entry.message, options: [], range: NSRange(location: 0, length: entry.message.utf16.count))
             

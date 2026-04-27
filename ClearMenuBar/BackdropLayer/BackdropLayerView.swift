@@ -611,8 +611,6 @@ extension CGImage {
     func resize(width: Int, height: Int) -> CGImage? {
         guard width > 0, height > 0 else { return nil }
 
-        let rep = NSBitmapImageRep(cgImage: self)
-
         let colorSpace = CGColorSpaceCreateDeviceRGB()
 
         guard let context = CGContext(
@@ -630,10 +628,7 @@ extension CGImage {
 
         context.interpolationQuality = .high
 
-        context.draw(
-            rep.cgImage!,
-            in: CGRect(x: 0, y: 0, width: width, height: height)
-        )
+        context.draw(self, in: CGRect(x: 0, y: 0, width: width, height: height))
 
         return context.makeImage()
     }

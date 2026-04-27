@@ -10,6 +10,7 @@
 
 - Supports single wallpaper or multiple wallpapers from a folder;
 - Supports light and dark mode.
+- The menu bar icon can be hidden by dragging it out. To bring it back, relaunch the app while it is already running.
 
 ## Feature Support
 
