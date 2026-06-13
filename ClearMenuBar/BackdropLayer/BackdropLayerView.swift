@@ -137,7 +137,12 @@ public class BackdropLayerView: NSVisualEffectView {
         self.wallpaper!.name = "wallpaper"
         
         if (appState.allowReduceTransparencyToBeDisabled) {
-            self.wallpaper?.contents = cropWallpaperBelowMenuBarArea(imagePath: appState.currentWallpaperPath!)
+            if let currentPath = appState.currentWallpaperPath {
+                self.wallpaper?.contents = cropWallpaperBelowMenuBarArea(imagePath: currentPath)
+            } else if let wallpaperPath = getCurrentWallpaperImagePath() {
+                self.wallpaper?.contents = cropWallpaperBelowMenuBarArea(imagePath: wallpaperPath)
+                appState.currentWallpaperPath = wallpaperPath
+            }
         } else {
             if let windowID = getCurrentWallpaperWindowID() {
                 self.wallpaper?.contents = getWallpaperScreenshot(cgWindowID: windowID)
@@ -551,13 +556,25 @@ public class BackdropLayerView: NSVisualEffectView {
             .receive(on: DispatchQueue.main)
             .sink { allow in
                 if (allow) {
-                    self.modifyImageAndSetAsWallpaper(path: self.appState.currentWallpaperPath!)
+                    if let currentPath = self.appState.currentWallpaperPath {
+                        self.modifyImageAndSetAsWallpaper(path: currentPath)
+                    } else if let wallpaperPath = self.getCurrentWallpaperImagePath() {
+                        self.modifyImageAndSetAsWallpaper(path: wallpaperPath)
+                    }
                 } else {
                     if (Wallpaper.isWallpaperFromADirectory(screen: .main).first! ?? false) {
-                        do {
-                            try Wallpaper.set(self.appState.currentWallpaperPath!, screen: .main)
-                        } catch {
-                            print("Error while setting wallpaper.")
+                        if let currentPath = self.appState.currentWallpaperPath {
+                            do {
+                                try Wallpaper.set(currentPath, screen: .main)
+                            } catch {
+                                print("Error while setting wallpaper.")
+                            }
+                        } else if let wallpaperPath = self.getCurrentWallpaperImagePath() {
+                            do {
+                                try Wallpaper.set(wallpaperPath, screen: .main)
+                            } catch {
+                                print("Error while setting wallpaper.")
+                            }
                         }
                     }
                 }
