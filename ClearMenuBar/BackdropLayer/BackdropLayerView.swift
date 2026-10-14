@@ -136,9 +136,13 @@ public class BackdropLayerView: NSVisualEffectView {
         self.wallpaper = CALayer()
         self.wallpaper!.name = "wallpaper"
         
-        if (appState.allowReduceTransparencyToBeDisabled) {
-            self.wallpaper?.contents = cropWallpaperBelowMenuBarArea(imagePath: appState.currentWallpaperPath!)
+        if appState.allowReduceTransparencyToBeDisabled,
+           let wallpaperPath = appState.currentWallpaperPath {
+            self.wallpaper?.contents = cropWallpaperBelowMenuBarArea(imagePath: wallpaperPath)
         } else {
+            if appState.allowReduceTransparencyToBeDisabled {
+                appState.allowReduceTransparencyToBeDisabled = false
+            }
             if let windowID = getCurrentWallpaperWindowID() {
                 self.wallpaper?.contents = getWallpaperScreenshot(cgWindowID: windowID)
             }
@@ -207,7 +211,7 @@ public class BackdropLayerView: NSVisualEffectView {
         self.container = CALayer()
         self.container?.name = "container"
         self.container?.masksToBounds = true
-        self.container?.allowsEdgeAntialiasing = true
+        self.container?.allowsEdgeAntialiasing = false
         self.container?.sublayers = [self.backdrop!, self.wallpaperContainer!]
         
         self.layer?.insertSublayer(self.container!, at: 0)
@@ -300,6 +304,13 @@ public class BackdropLayerView: NSVisualEffectView {
         if let url = notification.object as? URL {
             
             guard url.isFileURL else { return }
+
+            // 忽略程序自己设置的修改版壁纸，防止覆盖原始壁纸路径。
+            if let modified = appState.modifiedWallpaperPath {
+                let incoming = url.resolvingSymlinksInPath().standardizedFileURL
+                let generated = modified.resolvingSymlinksInPath().standardizedFileURL
+                if incoming == generated { return }
+            }
             
             if let appDir = appState.appSupportDirectory {
                 let normalizedURL = url.resolvingSymlinksInPath().standardizedFileURL
@@ -312,6 +323,7 @@ public class BackdropLayerView: NSVisualEffectView {
             
             if (self.currentWallpaperPath?.resolvingSymlinksInPath().path !=
                 url.resolvingSymlinksInPath().path) {
+                self.appState.originalWallpaperPath = url
                 self.currentWallpaperPath = url
             } else {
                 return
@@ -342,7 +354,6 @@ public class BackdropLayerView: NSVisualEffectView {
     }
     
     func modifyImageAndSetAsWallpaper(path: URL) {
-        appState.currentWallpaperPath = path
         if let modifiedWallpaper = self.addBlackRectangleToWallpaperOverMenuBarArea(imagePath: path),
            let modifiedWallpaperPath = Wallpaper.saveWallpaper(modifiedWallpaper) {
             do {
@@ -360,7 +371,7 @@ public class BackdropLayerView: NSVisualEffectView {
     func getLastWallpaperImagePath() -> URL? {
         let wallpapers = Wallpaper.get(screen: .main)
         
-        return wallpapers.first!
+        return wallpapers.first ?? nil
     }
     
     func getCurrentWallpaperImagePath() -> URL? {
@@ -370,62 +381,89 @@ public class BackdropLayerView: NSVisualEffectView {
     }
     
     func cropWallpaperBelowMenuBarArea(imagePath: URL) -> NSImage? {
-        guard let wallpaperImage = NSImage(contentsOf: imagePath) else {
-            print("Error while obtaining the wallpaper image.")
+        guard
+            let screen = NSScreen.main,
+            let wallpaperImage = NSImage(contentsOf: imagePath),
+            let wallpaperCGImage = wallpaperImage.cgImage(
+                forProposedRect: nil,
+                context: nil,
+                hints: nil
+            )
+        else {
+            print("Error while obtaining the wallpaper image or screen.")
             return nil
         }
-        
-        if let screenFrame = NSScreen.main?.frame, let wallpaperCGImage = wallpaperImage.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-            let screenWidth = screenFrame.width
-            let screenHeight = screenFrame.height
-            
-            let screenProportion = screenWidth / screenHeight
-            let wallpaperProportion = CGFloat(wallpaperCGImage.width) / CGFloat(wallpaperCGImage.height)
-            
-            var newWidth = Int(screenWidth)
-            var newHeight = Int(screenHeight)
-            var resizedCGImage: CGImage?
-            let cropRect: CGRect
-            var count = 3
-            
-            if wallpaperProportion >= screenProportion {
-                newWidth = Int(screenHeight / CGFloat(wallpaperCGImage.height) * CGFloat(wallpaperCGImage.width))
-                resizedCGImage = wallpaperCGImage.resize(width: newWidth, height: newHeight)
-                
-                while (count > 0 && resizedCGImage == nil) {
-                    resizedCGImage = wallpaperCGImage.resize(width: newWidth, height: newHeight)
-                    count -= 1
-                }
-                
-                let xOffset = (CGFloat(newWidth) - screenWidth) / 2
-                cropRect = CGRect(x: Int(xOffset), y: 0, width: Int(screenWidth), height: Int(NSScreen.main!.menuBarHeight))
-            } else {
-                newHeight = Int(screenWidth / CGFloat(wallpaperCGImage.width) * CGFloat(wallpaperCGImage.height))
-                resizedCGImage = wallpaperCGImage.resize(width: newWidth, height: newHeight)
-                
-                while (count > 0 && resizedCGImage == nil) {
-                    resizedCGImage = wallpaperCGImage.resize(width: newWidth, height: newHeight)
-                    count -= 1
-                }
-                
-                let yOffset = (CGFloat(newHeight) - screenHeight) / 2
-                cropRect = CGRect(x: 0, y: Int(yOffset), width: Int(screenWidth), height: Int(NSScreen.main!.menuBarHeight))
-            }
-            
-            var croppedCGImage = resizedCGImage?.cropping(to: cropRect)
-            
-            while croppedCGImage == nil {
-                croppedCGImage = resizedCGImage?.cropping(to: cropRect)
-            }
 
-            let croppedImage = NSImage(cgImage: croppedCGImage!, size: NSSize(width: Int(screenWidth), height: Int(screenHeight)))
-            
-            return croppedImage
+        // NSScreen 使用逻辑点；CGImage 使用物理像素。
+        let scale = screen.backingScaleFactor
+        let screenWidth = screen.frame.width
+        let screenHeight = screen.frame.height
+        let menuBarHeight = screen.menuBarHeight
+
+        let targetWidth = Int((screenWidth * scale).rounded())
+        let targetHeight = Int((screenHeight * scale).rounded())
+        let targetMenuBarHeight = Int((menuBarHeight * scale).rounded())
+
+        guard
+            targetWidth > 0,
+            targetHeight > 0,
+            targetMenuBarHeight > 0,
+            targetMenuBarHeight <= targetHeight,
+            wallpaperCGImage.width > 0,
+            wallpaperCGImage.height > 0
+        else {
+            print("Invalid screen or wallpaper dimensions.")
+            return nil
         }
-        
-        return nil
+
+        let sourceWidth = CGFloat(wallpaperCGImage.width)
+        let sourceHeight = CGFloat(wallpaperCGImage.height)
+        let screenRatio = CGFloat(targetWidth) / CGFloat(targetHeight)
+        let wallpaperRatio = sourceWidth / sourceHeight
+
+        // 等比缩放至完整覆盖屏幕，所有尺寸均为物理像素。
+        let resizedWidth: Int
+        let resizedHeight: Int
+
+        if wallpaperRatio >= screenRatio {
+            resizedHeight = targetHeight
+            resizedWidth = Int(ceil(CGFloat(targetHeight) * wallpaperRatio))
+        } else {
+            resizedWidth = targetWidth
+            resizedHeight = Int(ceil(CGFloat(targetWidth) / wallpaperRatio))
+        }
+
+        guard let resizedImage = wallpaperCGImage.resize(
+            width: resizedWidth,
+            height: resizedHeight
+        ) else {
+            print("Failed to resize wallpaper.")
+            return nil
+        }
+
+        // 屏幕内容居中裁切后，取顶部菜单栏对应的区域。
+        let xOffset = max(0, (resizedImage.width - targetWidth) / 2)
+        let yOffset = max(0, (resizedImage.height - targetHeight) / 2)
+
+        let cropRect = CGRect(
+            x: xOffset,
+            y: yOffset,
+            width: targetWidth,
+            height: targetMenuBarHeight
+        )
+
+        guard let croppedCGImage = resizedImage.cropping(to: cropRect) else {
+            print("Failed to crop wallpaper for menu bar.")
+            return nil
+        }
+
+        // 像素尺寸是 Retina 的 2 倍；逻辑显示尺寸仍是屏幕点数。
+        return NSImage(
+            cgImage: croppedCGImage,
+            size: NSSize(width: screenWidth, height: menuBarHeight)
+        )
     }
-    
+
     func addBlackRectangleToWallpaperOverMenuBarArea(imagePath: URL) -> NSImage? {
         guard let wallpaperImage = NSImage(contentsOf: imagePath) else {
             print("Error while obtaining the wallpaper image.")
@@ -551,14 +589,44 @@ public class BackdropLayerView: NSVisualEffectView {
             .receive(on: DispatchQueue.main)
             .sink { allow in
                 if (allow) {
-                    self.modifyImageAndSetAsWallpaper(path: self.appState.currentWallpaperPath!)
-                } else {
-                    if (Wallpaper.isWallpaperFromADirectory(screen: .main).first! ?? false) {
-                        do {
-                            try Wallpaper.set(self.appState.currentWallpaperPath!, screen: .main)
-                        } catch {
-                            print("Error while setting wallpaper.")
+                    // 开启开关前，先读取 macOS 当前实际壁纸。
+                    // 如果当前壁纸不是本程序生成的修改版，就以它作为最新原图。
+                    let actualWallpaperPath =
+                        (Wallpaper.getCurrent(screen: .main).first ?? nil)
+                        ?? (Wallpaper.get(screen: .main).first ?? nil)
+
+                    if let actualPath = actualWallpaperPath {
+                        let actualNormalized =
+                            actualPath.resolvingSymlinksInPath().standardizedFileURL
+                        let modifiedNormalized = self.appState.modifiedWallpaperPath?
+                            .resolvingSymlinksInPath().standardizedFileURL
+
+                        if actualNormalized != modifiedNormalized {
+                            self.appState.originalWallpaperPath = actualPath
+                            self.appState.currentWallpaperPath = actualPath
+                            print("已更新原始壁纸路径：\(actualPath.path)")
+                        } else {
+                            print("当前壁纸为程序生成的修改版，保留已保存的原图路径。")
                         }
+                    }
+
+                    guard let wallpaperPath = self.appState.originalWallpaperPath else {
+                        self.appState.allowReduceTransparencyToBeDisabled = false
+                        return
+                    }
+                    self.modifyImageAndSetAsWallpaper(path: wallpaperPath)
+                } else {
+                    // 关闭实验模式时，恢复原始壁纸。
+                    if let originalWallpaperPath = self.appState.originalWallpaperPath {
+                        do {
+                            try Wallpaper.set(originalWallpaperPath, screen: .main)
+                            self.appState.currentWallpaperPath = originalWallpaperPath
+                            self.updateMenuBarBackground(path: originalWallpaperPath)
+                        } catch {
+                            print("Failed to restore original wallpaper: \(error)")
+                        }
+                    } else {
+                        print("Cannot restore original wallpaper: original path is unavailable.")
                     }
                 }
                 self.viewDidChangeEffectiveAppearance()
@@ -572,7 +640,7 @@ public class BackdropLayerView: NSVisualEffectView {
         self.container!.frame = self.layer?.bounds ?? .zero
         self.backdrop!.frame = self.layer?.bounds.offsetBy(dx: 0, dy: 0) ?? .zero
         self.tint!.frame = self.layer?.bounds ?? .zero
-        self.wallpaper!.frame = self.layer?.bounds.offsetBy(dx: 0, dy: 0) ?? .zero
+        self.wallpaper!.frame = self.layer?.bounds ?? .zero
         self.wallpaperContainer!.frame = self.layer?.bounds ?? .zero
         self.gradient!.frame = self.layer?.bounds ?? .zero
     }
