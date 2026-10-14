@@ -16,6 +16,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @IBOutlet weak var menu: NSMenu?
     
     var preferencesWindow: NSWindow?
+    // 保持窗口控制器存活，避免窗口失效
+    var menuBarWindowController: MenuBarWindowController?
+    var shadowWindowController: ShadowWindowController?
         
     override init() {
         super.init()
@@ -33,8 +36,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             ],
             backing: .buffered, defer: false)
         
-        let menuBarWindowController = MenuBarWindowController(window: menuBarWindow)
-        menuBarWindowController.showWindow(self)
+        self.menuBarWindowController = MenuBarWindowController(window: menuBarWindow)
+        self.menuBarWindowController?.showWindow(self)
         
         let shadowWindow = ShadowWindow(
             contentRect: NSRect(x: 0,
@@ -46,8 +49,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             backing: .buffered, defer: false
         )
         
-        let shadowWindowController = ShadowWindowController(window: shadowWindow)
-        shadowWindowController.showWindow(self)
+        self.shadowWindowController = ShadowWindowController(window: shadowWindow)
+        self.shadowWindowController?.showWindow(self)
     }
     
     override func awakeFromNib() {

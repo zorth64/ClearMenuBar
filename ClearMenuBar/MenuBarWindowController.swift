@@ -41,7 +41,7 @@ class MenuBarWindowController: NSWindowController {
         
         let backdropView = BackdropLayerView()
         backdropView.layerUsesCoreImageFilters = true
-        backdropView.autoresizingMask = [.width]
+        backdropView.autoresizingMask = [.width, .height]
         
         window.contentView = backdropView
         
