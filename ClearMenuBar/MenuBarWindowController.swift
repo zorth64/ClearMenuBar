@@ -21,17 +21,10 @@ class MenuBarWindow: NSWindow {
         hasShadow = false
         
         level = NSWindow.Level.statusBar
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenNone]
+        collectionBehavior = [.fullScreenNone]
         backgroundColor = NSColor.clear
-        alphaValue = 0.0
+        alphaValue = 1.0
         ignoresMouseEvents = true
-        
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 2.0
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            
-            self.animator().alphaValue = 1.0
-        })
     }
 }
 
